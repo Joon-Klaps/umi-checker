@@ -133,19 +133,21 @@ pub fn is_umi_in_read(umi: &[u8], read: &[u8], max_mismatches: u32) -> bool {
         for chunk_idx in 0..num_chunks {
             let start = chunk_idx * chunk_size;
             // The last chunk extends to the end of the UMI
-            let end = if chunk_idx == num_chunks - 1 { umi_len } else { (chunk_idx + 1) * chunk_size };
+            let end = if chunk_idx == num_chunks - 1 {
+                umi_len
+            } else {
+                (chunk_idx + 1) * chunk_size
+            };
 
-            if &umi[start..end] == &window[start..end] {
+            if umi[start..end] == window[start..end] {
                 potential_match = true;
                 break;
             }
         }
 
         // Only calculate full hamming distance if a pigeonhole chunk matched
-        if potential_match {
-            if hamming_distance_with_n(umi, window) <= max_mismatches {
-                return true;
-            }
+        if potential_match && hamming_distance_with_n(umi, window) <= max_mismatches {
+            return true;
         }
     }
 

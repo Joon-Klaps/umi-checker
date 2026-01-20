@@ -6,13 +6,17 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-/// Generic writer abstraction that can be either a FASTQ writer or a BAM writer.
+/// Generic writer abstraction that can be either a FASTQ writer, a BAM writer,
+/// or a no-op sink used when the user did not request any output files.
 ///
 /// This type encapsulates format-specific write logic so higher-level code can
-/// work with a single writer type for both FASTQ and BAM outputs.
+/// work with a single writer type for both FASTQ and BAM outputs, and allows
+/// silent no-op writes when outputs are disabled.
 pub enum GenericWriter {
     Fastq(Box<dyn Write>),
     Bam(bam::Writer),
+    /// No-op sink: used when output was not requested (no files should be written).
+    Sink,
 }
 
 impl GenericWriter {
@@ -37,7 +41,9 @@ impl GenericWriter {
             w.write_all(b"\n")?;
             w.write_all(seq)?;
             w.write_all(b"\n+\n")?;
-            if let Some(q) = qual { w.write_all(q)?; }
+            if let Some(q) = qual {
+                w.write_all(q)?;
+            }
             w.write_all(b"\n")?;
         }
         Ok(())
@@ -62,8 +68,12 @@ pub struct FastqRecord {
 }
 
 impl BioRecord for FastqRecord {
-    fn seq(&self) -> &[u8] { &self.seq }
-    fn header(&self) -> &[u8] { &self.head }
+    fn seq(&self) -> &[u8] {
+        &self.seq
+    }
+    fn header(&self) -> &[u8] {
+        &self.head
+    }
     fn write_to(self, writer: &mut GenericWriter) -> Result<()> {
         writer.write_fastq(&self.head, &self.seq, self.qual.as_deref())
     }
@@ -74,12 +84,16 @@ impl BioRecord for FastqRecord {
 pub struct BamRecord {
     pub rec: bam::Record,
     #[allow(dead_code)] // The seq is read via the trait
-    pub seq: Vec<u8>
+    pub seq: Vec<u8>,
 }
 
 impl BioRecord for BamRecord {
-    fn seq(&self) -> &[u8] { &self.seq }
-    fn header(&self) -> &[u8] { self.rec.qname() }
+    fn seq(&self) -> &[u8] {
+        &self.seq
+    }
+    fn header(&self) -> &[u8] {
+        self.rec.qname()
+    }
     fn write_to(self, writer: &mut GenericWriter) -> Result<()> {
         writer.write_bam(&self.rec)
     }
@@ -88,9 +102,10 @@ impl BioRecord for BamRecord {
 /// Create a writer for FASTQ output. If `path` ends with `.gz`, returns a
 /// gzip-wrapped writer.
 pub fn create_fastq_writer(path: &Path) -> Result<Box<dyn Write>> {
-    let file = File::create(path).with_context(|| format!("Failed to create {}", path.display()))?;
+    let file =
+        File::create(path).with_context(|| format!("Failed to create {}", path.display()))?;
     let writer = BufWriter::new(file);
-    if path.extension().map_or(false, |e| e == "gz") {
+    if path.extension().is_some_and(|e| e == "gz") {
         Ok(Box::new(GzEncoder::new(writer, Compression::default())))
     } else {
         Ok(Box::new(writer))

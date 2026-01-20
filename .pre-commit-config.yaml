@@ -14,8 +14,8 @@ repos:
       hooks:
           - id: cargo-fmt
             name: cargo fmt
-            description: Verify Rust code is formatted (fails if not formatted)
-            entry: cargo fmt --all -- --check
+            description: Verify Rust code is formatted (update if not formatted)
+            entry: cargo fmt --all --
             language: system
             pass_filenames: false
 

@@ -1,10 +1,12 @@
 use anyhow::{Context, Result};
 use needletail::parse_fastx_file;
+use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
 use std::path::Path;
-use rayon::prelude::*;
 
-use crate::io::{GenericWriter, BioRecord, FastqRecord, BamRecord, create_fastq_writer, create_bam_writer};
+use crate::io::{
+    create_bam_writer, create_fastq_writer, BamRecord, BioRecord, FastqRecord, GenericWriter,
+};
 use crate::matcher::is_umi_in_read;
 
 const BATCH_SIZE: usize = 10_000;
@@ -23,14 +25,17 @@ fn process_batch<R: BioRecord>(
     umi_len: usize,
 ) -> Result<(usize, usize)> {
     // 1. Parallel compute (Heavy lifting)
-    let results: Vec<bool> = batch.par_iter().map(|rec| {
-        if let Some(umi) = crate::extract_umi_from_header(rec.header(), umi_len) {
-            // This is our SIMD-optimized, zero-allocation matcher
-            is_umi_in_read(&umi, rec.seq(), max_mismatches)
-        } else {
-            false
-        }
-    }).collect();
+    let results: Vec<bool> = batch
+        .par_iter()
+        .map(|rec| {
+            if let Some(umi) = crate::extract_umi_from_header(rec.header(), umi_len) {
+                // This is our SIMD-optimized, zero-allocation matcher
+                is_umi_in_read(&umi, rec.seq(), max_mismatches)
+            } else {
+                false
+            }
+        })
+        .collect();
 
     // 2. Serial write (I/O)
     let mut removed = 0;
@@ -54,11 +59,21 @@ fn process_batch<R: BioRecord>(
 /// `max_m` controls allowed mismatches and `umi_len` is the expected UMI length
 /// used when extracting the UMI from the read header.
 pub fn process_fastq(
-    input: &Path, kept_out: &Path, rem_out: &Path, max_m: u32, umi_len: usize,
+    input: &Path,
+    kept_out: Option<&Path>,
+    rem_out: Option<&Path>,
+    max_m: u32,
+    umi_len: usize,
 ) -> Result<(usize, usize, usize)> {
     let mut reader = parse_fastx_file(input).context("Failed to parse FASTX file")?;
-    let mut kept_w = GenericWriter::Fastq(create_fastq_writer(kept_out)?);
-    let mut rem_w = GenericWriter::Fastq(create_fastq_writer(rem_out)?);
+    let mut kept_w = match kept_out {
+        Some(p) => GenericWriter::Fastq(create_fastq_writer(p)?),
+        None => GenericWriter::Sink,
+    };
+    let mut rem_w = match rem_out {
+        Some(p) => GenericWriter::Fastq(create_fastq_writer(p)?),
+        None => GenericWriter::Sink,
+    };
 
     let mut stats = (0, 0, 0); // total, removed, kept
     let mut batch = Vec::with_capacity(BATCH_SIZE);
@@ -74,13 +89,15 @@ pub fn process_fastq(
 
         if batch.len() >= BATCH_SIZE {
             let (r_inc, k_inc) = process_batch(batch, &mut kept_w, &mut rem_w, max_m, umi_len)?;
-            stats.1 += r_inc; stats.2 += k_inc;
+            stats.1 += r_inc;
+            stats.2 += k_inc;
             batch = Vec::with_capacity(BATCH_SIZE);
         }
     }
     // Final flush...
     let (r_inc, k_inc) = process_batch(batch, &mut kept_w, &mut rem_w, max_m, umi_len)?;
-    stats.1 += r_inc; stats.2 += k_inc;
+    stats.1 += r_inc;
+    stats.2 += k_inc;
 
     Ok(stats)
 }
@@ -91,16 +108,24 @@ pub fn process_fastq(
 /// `rem_out` files similarly to `process_fastq`. Uses the BAM header from the
 /// input when creating output BAM writers.
 pub fn process_bam(
-    input: &Path, kept_out: &Path, rem_out: &Path, max_m: u32, umi_len: usize,
+    input: &Path,
+    kept_out: Option<&Path>,
+    rem_out: Option<&Path>,
+    max_m: u32,
+    umi_len: usize,
 ) -> Result<(usize, usize, usize)> {
     let mut reader = bam::Reader::from_path(input).context("Failed to open BAM file")?;
     let header = bam::Header::from_template(reader.header());
 
-    // Note: header is used to initialize writers
-
-
-    let mut kept_w = GenericWriter::Bam(create_bam_writer(kept_out, &header)?);
-    let mut rem_w = GenericWriter::Bam(create_bam_writer(rem_out, &header)?);
+    // Note: header is used to initialize writers (if provided)
+    let mut kept_w = match kept_out {
+        Some(p) => GenericWriter::Bam(create_bam_writer(p, &header)?),
+        None => GenericWriter::Sink,
+    };
+    let mut rem_w = match rem_out {
+        Some(p) => GenericWriter::Bam(create_bam_writer(p, &header)?),
+        None => GenericWriter::Sink,
+    };
 
     let mut stats = (0, 0, 0); // total, removed, kept
     let mut batch = Vec::with_capacity(BATCH_SIZE);
@@ -113,13 +138,15 @@ pub fn process_bam(
 
         if batch.len() >= BATCH_SIZE {
             let (r_inc, k_inc) = process_batch(batch, &mut kept_w, &mut rem_w, max_m, umi_len)?;
-            stats.1 += r_inc; stats.2 += k_inc;
+            stats.1 += r_inc;
+            stats.2 += k_inc;
             batch = Vec::with_capacity(BATCH_SIZE);
         }
     }
     // Final flush...
     let (r_inc, k_inc) = process_batch(batch, &mut kept_w, &mut rem_w, max_m, umi_len)?;
-    stats.1 += r_inc; stats.2 += k_inc;
+    stats.1 += r_inc;
+    stats.2 += k_inc;
 
     Ok(stats)
 }

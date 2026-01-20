@@ -1,5 +1,5 @@
-use tempfile::NamedTempFile;
 use std::path::Path;
+use tempfile::NamedTempFile;
 
 #[test]
 fn test_process_fastq_integration() {
@@ -14,7 +14,8 @@ fn test_process_fastq_integration() {
         removed_tmp.path(),
         1, // allow 1 mismatch
         12,
-    ).expect("processing failed");
+    )
+    .expect("processing failed");
 
     // From our small FASTQ: read1 and read2 contain the UMI in the sequence (read3 does not)
     assert_eq!(total, 3);
@@ -35,7 +36,8 @@ fn test_process_bam_integration() {
         removed_tmp.path(),
         2, // allow 1 mismatch
         12,
-    ).expect("processing failed");
+    )
+    .expect("processing failed");
 
     // From our small FASTQ: read1 and read2 contain the UMI in the sequence (read3 does not)
     assert_eq!(total, 17619);

@@ -72,13 +72,15 @@ jobs:
                   mkdir -p dist
                   cp target/release/${{ env.CRATE }} dist/
                   strip dist/${{ env.CRATE }} || true
+                  # Prepare Raw Binary
+                  cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Linux-x86_64
                   zip -j "dist/${{ env.CRATE }}-${VERSION}-linux-x86_64.zip" dist/${{ env.CRATE }}
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
                   name: ${{ env.CRATE }}-linux-x86_64
-                  path: dist/${{ env.CRATE }}-*.zip
+                  path: dist/*
 
     build-linux-aarch64:
         name: Build Linux aarch64 (cross) 🐧
@@ -104,13 +106,15 @@ jobs:
                   VERSION=$(grep '^version' Cargo.toml | head -n1 | sed -E 's/version = "([^"]+)"/\1/')
                   mkdir -p dist
                   cp target/aarch64-unknown-linux-gnu/release/${{ env.CRATE }} dist/${{ env.CRATE }}
+                  # Prepare Raw Binary
+                  cp target/aarch64-unknown-linux-gnu/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Linux-aarch64
                   zip -j "dist/${{ env.CRATE }}-${VERSION}-linux-aarch64.zip" dist/${{ env.CRATE }}
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
                   name: ${{ env.CRATE }}-linux-aarch64
-                  path: dist/${{ env.CRATE }}-*.zip
+                  path: dist/*
 
     build-windows:
         name: Build Windows x86_64 (release) 🪟
@@ -174,14 +178,15 @@ jobs:
                   mkdir -p dist
                   cp target/release/${{ env.CRATE }} dist/
                   ARCH=$(uname -m)
+                  # Prepare Raw Binary
+                  cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Darwin-${ARCH}
                   zip -j "dist/${{ env.CRATE }}-${VERSION}-macos-${ARCH}.zip" dist/${{ env.CRATE }}
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
                   name: ${{ env.CRATE }}-macos
-                  path: dist/${{ env.CRATE }}-*.zip
-
+                  path: dist/*
     release:
         name: Create GitHub Release (tag) 🚀
         runs-on: ubuntu-latest
@@ -217,9 +222,9 @@ jobs:
             - name: Generate checksums for release assets
               run: |
                   cd artifacts
-                  # If no archives, exit early
                   shopt -s nullglob || true
-                  FILES=( *.zip )
+                  FILES=( * )
+                  FILES=( $(printf "%s\n" "${FILES[@]}" | grep -v '^checksums.txt$' || true) )
                   if [ ${#FILES[@]} -eq 0 ]; then
                     echo "No release artifacts found!"
                     ls -la

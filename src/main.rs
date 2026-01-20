@@ -5,7 +5,11 @@ use std::path::{Path, PathBuf};
 use umi_checker::processing::{process_bam, process_fastq};
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "UMI presence validator - checks if UMI from header exists in read")]
+#[command(
+    author,
+    version,
+    about = "UMI presence validator - checks if UMI from header exists in read"
+)]
 struct Args {
     /// Input file (FASTQ, FASTQ.gz, BAM, or SAM)
     #[arg(short, long)]
@@ -19,10 +23,10 @@ struct Args {
     #[arg(short = 'l', long, default_value_t = 12)]
     umi_length: usize,
 
-    /// Output file prefix (suffix will be derived from the input).
-    /// Example: --output outprefix -> creates outprefix.fastq and outprefix.removed.fastq
+    /// Optional output file prefix (suffix will be derived from the input).
+    /// If not provided, no output files will be written.
     #[arg(short, long)]
-    output: PathBuf,
+    output: Option<PathBuf>,
 
     /// Number of threads for parallel processing
     #[arg(short, long, default_value_t = 4)]
@@ -75,7 +79,10 @@ impl FileType {
 /// Build output file paths for the matched and removed sets based on the
 /// provided `out_prefix` and detected input suffix. The returned pair is
 /// `(matched_path, removed_path)`.
-fn build_output_paths(input: &Path, out_prefix: &Path) -> anyhow::Result<(std::path::PathBuf, std::path::PathBuf)> {
+fn build_output_paths(
+    input: &Path,
+    out_prefix: &Path,
+) -> anyhow::Result<(std::path::PathBuf, std::path::PathBuf)> {
     let fname = input
         .file_name()
         .and_then(|s| s.to_str())
@@ -100,7 +107,9 @@ fn build_output_paths(input: &Path, out_prefix: &Path) -> anyhow::Result<(std::p
 
     let prefix_str = out_prefix.to_string_lossy();
     let base = if prefix_str.ends_with(&format!(".{}", suffix)) {
-        prefix_str.trim_end_matches(&format!(".{}", suffix)).to_string()
+        prefix_str
+            .trim_end_matches(&format!(".{}", suffix))
+            .to_string()
     } else {
         prefix_str.to_string()
     };
@@ -130,28 +139,61 @@ fn main() -> Result<()> {
     // Determine file type and process
     let file_type = FileType::from_path(&args.input)?;
 
-    // Build output file paths (matched + removed) based on input suffix and provided prefix
-    let (clean_output, removed_output) = build_output_paths(&args.input, &args.output)?;
+    // Build output file paths (matched + removed) based on input suffix and provided prefix.
+    // If --output is not provided we won't write output files (use None).
+    let (clean_output, removed_output) = if let Some(ref out) = args.output {
+        let (c, r) = build_output_paths(&args.input, out)?;
+        (Some(c), Some(r))
+    } else {
+        (None, None)
+    };
 
     // Start timer
     let start = std::time::Instant::now();
 
     let (total, with_umi, without_umi) = match file_type {
-        FileType::Fastq | FileType::FastqGz => {
-            process_fastq(&args.input, &clean_output, &removed_output, args.mismatches, args.umi_length)?
-        }
-        FileType::Bam | FileType::Sam => {
-            process_bam(&args.input, &clean_output, &removed_output, args.mismatches, args.umi_length)?
-        }
+        FileType::Fastq | FileType::FastqGz => process_fastq(
+            &args.input,
+            clean_output.as_deref(),
+            removed_output.as_deref(),
+            args.mismatches,
+            args.umi_length,
+        )?,
+        FileType::Bam | FileType::Sam => process_bam(
+            &args.input,
+            clean_output.as_deref(),
+            removed_output.as_deref(),
+            args.mismatches,
+            args.umi_length,
+        )?,
     };
 
     let elapsed = start.elapsed();
 
     // Output concise tab-separated summary
-    let perc_with = if total > 0 { (with_umi as f64 / total as f64) * 100.0 } else { 0.0 };
-    let perc_without = if total > 0 { (without_umi as f64 / total as f64) * 100.0 } else { 0.0 };
+    let perc_with = if total > 0 {
+        (with_umi as f64 / total as f64) * 100.0
+    } else {
+        0.0
+    };
+    let perc_without = if total > 0 {
+        (without_umi as f64 / total as f64) * 100.0
+    } else {
+        0.0
+    };
 
-    println!("{}\t{}\t{:.2}\t{}\t{:.2}", total, with_umi, perc_with, without_umi, perc_without);
+    // Include input filename as first column for easier aggregation in shell loops
+    let fname = args
+        .input
+        .file_name()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| args.input.to_string_lossy().to_string());
+
+    println!(
+        "{}\t{}\t{}\t{:.2}\t{}\t{:.2}",
+        fname, total, with_umi, perc_with, without_umi, perc_without
+    );
 
     if args.verbose {
         println!("Elapsed: {:.3}s", elapsed.as_secs_f64());

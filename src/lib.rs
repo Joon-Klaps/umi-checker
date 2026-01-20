@@ -1,5 +1,5 @@
-pub mod matcher;
 pub mod io;
+pub mod matcher;
 pub mod processing;
 
 /// Extract the UMI from a read header.
@@ -16,12 +16,16 @@ pub fn extract_umi_from_header(header: &[u8], expected_length: usize) -> Option<
     let umi_str = header_str
         .split_whitespace()
         .next()?
-        .rsplit(|c| c == ':' || c == '_')
+        .rsplit([':', '_'])
         .next()?;
 
     if umi_str.len() != expected_length {
         // Throw an exception if UMI length does not match expected length
-        panic!("UMI length does not match expected length: expected {}, found {}", expected_length, umi_str.len());
+        panic!(
+            "UMI length does not match expected length: expected {}, found {}",
+            expected_length,
+            umi_str.len()
+        );
     }
 
     Some(umi_str.as_bytes().to_ascii_uppercase())

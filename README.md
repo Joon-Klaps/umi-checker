@@ -1,77 +1,57 @@
 # umi-checker
 
-A small, fast CLI tool for working with UMIs (Unique Molecular Identifiers).
+A small, fast CLI tool for checking the presence of UMIs (Unique Molecular Identifiers) in fastq files or BAM files.
 
 ## Quick Start ✅
 
-- Build locally (debug):
+You can install the latest release with a single command:
 
 ```bash
-cargo build
+curl -fsSL https://raw.githubusercontent.com/Joon-Klaps/umi-checker/main/install.sh | bash
 ```
-
-- Run tests:
 
 ```bash
-cargo test --all
+umi-checker --help
+
+UMI presence validator - checks if UMI from header exists in read
+
+Usage: umi-checker [OPTIONS] --input <INPUT> --output <OUTPUT>
+
+Options:
+  -i, --input <INPUT>            Input file (FASTQ, FASTQ.gz, BAM, or SAM)
+  -m, --mismatches <MISMATCHES>  Maximum number of mismatches allowed when finding UMI in read (<=3) [default: 0]
+  -l, --umi-length <UMI_LENGTH>  UMI length in base pairs [default: 12]
+  -o, --output <OUTPUT>          Output file prefix (suffix will be derived from the input). Example: --output outprefix -> creates outprefix.fastq and outprefix.removed.fastq
+  -t, --threads <THREADS>        Number of threads for parallel processing [default: 4]
+  -v, --verbose                  Verbose output (show elapsed time)
+  -h, --help                     Print help
+  -V, --version                  Print version
 ```
 
-- Build release binary:
+The output printed to sdout will contain the following tab-separated columns:
+
+- read: Input read file name
+- total reads: Total number of reads processed
+- reads with umi: Number of reads where UMI was found in the sequence
+- % with umi: Percentage of reads with UMI
+- reads without umi: Number of reads where UMI was not found in the sequence
+- %perc without umi: Percentage of reads without UMI
+
+Example usage:
 
 ```bash
-cargo build --release
+echo -e "read \ttotal reads\treads with umi\t% with umi\treads without umi\t%perc without umi" > abundance.tsv
+for read in `*.fastq.gz`; do
+    umi-checker -i $read -o ${read%.fastq.gz}.umi_checked >> abundance.tsv
+done
 ```
 
-- Run the CLI (after building):
+If you only want a tab-separated summary on stdout (for aggregating across many files) and don't want output files created, omit `--output`. The tool will print a single line with the input filename as the first column and will not write any output files.
 
-```bash
-./target/debug/umi-checker --help
-```
-
-## Development & Tooling 🔧
-
-- Format the code:
-
-```bash
-cargo fmt --all
-```
-
-- Lint with Clippy (errors on warnings):
-
-```bash
-cargo clippy --all-targets --all-features -- -D warnings
-```
-
-- Use pre-commit hooks (recommended):
-
-```bash
-pip install pre-commit
-pre-commit install
-pre-commit run --all-files
-```
-
-The repository includes a `.pre-commit-config.yaml` that runs basic hygiene hooks and verifies formatting, Clippy, and compilation.
-
-## CI / Releases 🚀
-
-This project includes a GitHub Actions workflow (`.github/workflows/ci.yml`) which:
-
-- Runs format checks, Clippy, and tests on push and PRs
-- Builds release artifacts for Linux (x86_64 & aarch64), macOS, and Windows
-- Attaches artifacts to a GitHub Release when pushing a tag like `v1.2.3`
-
-Notes about cross-building for `aarch64-unknown-linux-gnu`:
-
-- The workflow uses `cross` (https://github.com/cross-rs/cross). If you want to reproduce locally, install `cross` with `cargo install --locked cross` and run `cross build --target aarch64-unknown-linux-gnu --release`.
-
-## Packaging & Artifacts
-
-Release artifacts are named `umi-checker-<version>-<platform>.zip` where `<version>` is taken from `Cargo.toml`.
-
-## Contributing
+## Contributing 🧑‍💻
 
 Contributions are welcome! Please open an issue or a pull request with a clear description of the change and tests when applicable.
 
 ## License
 
-See `LICENSE` (if present) — otherwise contact the maintainers for licensing details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
