@@ -116,45 +116,6 @@ jobs:
                   name: ${{ env.CRATE }}-linux-aarch64
                   path: dist/*
 
-    build-windows:
-        name: Build Windows x86_64 (release) 🪟
-        runs-on: windows-latest
-        needs: test
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Install Rust
-              uses: actions-rs/toolchain@v1
-              with:
-                  profile: minimal
-                  toolchain: stable
-
-            - name: Cache cargo
-              uses: actions/cache@v4
-              with:
-                  path: target
-                  key: ${{ runner.os }}-cargo-target
-
-            - name: Build release (Windows)
-              shell: pwsh
-              run: |
-                  cargo build --release
-
-            - name: Package artifact (Windows)
-              shell: pwsh
-              run: |
-                  $version = Select-String -Path Cargo.toml -Pattern '^version' | Select-Object -First 1
-                  $version = ($version -replace 'version = "([^"]+)"','$1')
-                  New-Item -ItemType Directory -Path dist -Force | Out-Null
-                  Copy-Item -Path target\release\${{ env.CRATE }}.exe -Destination dist\
-                  Compress-Archive -LiteralPath dist\${{ env.CRATE }}.exe -DestinationPath dist\${{ env.CRATE }}-${version}-windows-x86_64.zip
-
-            - name: Upload artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ${{ env.CRATE }}-windows-x86_64
-                  path: dist/${{ env.CRATE }}-*.zip
-
     build-macos-intel:
         name: Build macOS Intel x86_64 (release) 🍎
         runs-on: macos-13
