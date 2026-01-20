@@ -1,0 +1,34 @@
+# Pre-commit hooks for Rust project
+# Install pre-commit: pip install pre-commit
+# Setup hooks: pre-commit install
+
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v4.5.0
+      hooks:
+          - id: trailing-whitespace
+          - id: end-of-file-fixer
+          - id: check-yaml
+
+    - repo: local
+      hooks:
+          - id: cargo-fmt
+            name: cargo fmt
+            description: Verify Rust code is formatted (fails if not formatted)
+            entry: cargo fmt --all -- --check
+            language: system
+            pass_filenames: false
+
+          - id: cargo-clippy
+            name: cargo clippy
+            description: Lint Rust code with cargo clippy (errors on warnings)
+            entry: cargo clippy --all-targets --all-features -- -D warnings
+            language: system
+            pass_filenames: false
+
+          - id: cargo-check
+            name: cargo check
+            description: Check if Rust code compiles
+            entry: cargo check --all-targets --all-features
+            language: system
+            pass_filenames: false
