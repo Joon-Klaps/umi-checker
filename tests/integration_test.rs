@@ -10,8 +10,8 @@ fn test_process_fastq_integration() {
     // Call processing function
     let (total, with_umi, without_umi) = umi_checker::processing::process_fastq(
         &data_path,
-        matched_tmp.path(),
-        removed_tmp.path(),
+        Some(matched_tmp.path()),
+        Some(removed_tmp.path()),
         1, // allow 1 mismatch
         12,
     )
@@ -32,8 +32,8 @@ fn test_process_bam_integration() {
     // Call processing function
     let (total, with_umi, without_umi) = umi_checker::processing::process_bam(
         &data_path,
-        matched_tmp.path(),
-        removed_tmp.path(),
+        Some(matched_tmp.path()),
+        Some(removed_tmp.path()),
         2, // allow 1 mismatch
         12,
     )

@@ -42,7 +42,7 @@ Example usage:
 ```bash
 echo -e "read \ttotal reads\treads with umi\t% with umi\treads without umi\t%perc without umi" > abundance.tsv
 for read in `*.fastq.gz`; do
-    umi-checker -i $read -o ${read%.fastq.gz}.umi_checked >> abundance.tsv
+    umi-checker -i $read >> abundance.tsv
 done
 ```
 
