@@ -83,31 +83,36 @@ jobs:
                   path: dist/*
 
     build-linux-aarch64:
-        name: Build Linux aarch64 (cross) 🐧
-        runs-on: ubuntu-latest
+        name: Build Linux aarch64 (native) 🐧
+        runs-on: ubuntu-24.04-arm
         needs: test
         steps:
             - uses: actions/checkout@v4
 
-            - name: Install Rust & Docker (for cross)
+            - name: Install Rust
               uses: actions-rs/toolchain@v1
               with:
                   profile: minimal
                   toolchain: stable
 
-            - name: Install cross
-              run: cargo install --locked cross || true
+            - name: Cache cargo
+              uses: actions/cache@v4
+              with:
+                  path: target
+                  key: ${{ runner.os }}-arm64-cargo-target
 
-            - name: Cross build aarch64-unknown-linux-gnu
-              run: cross build --target aarch64-unknown-linux-gnu --release
+            - name: Build release
+              run: |
+                  cargo build --release
 
             - name: Package artifact
               run: |
                   VERSION=$(grep '^version' Cargo.toml | head -n1 | sed -E 's/version = "([^"]+)"/\1/')
                   mkdir -p dist
-                  cp target/aarch64-unknown-linux-gnu/release/${{ env.CRATE }} dist/${{ env.CRATE }}
+                  cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}
+                  strip dist/${{ env.CRATE }} || true
                   # Prepare Raw Binary
-                  cp target/aarch64-unknown-linux-gnu/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Linux-aarch64
+                  cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Linux-aarch64
                   zip -j "dist/${{ env.CRATE }}-${VERSION}-linux-aarch64.zip" dist/${{ env.CRATE }}
 
             - name: Upload artifact
@@ -118,7 +123,7 @@ jobs:
 
     build-macos-intel:
         name: Build macOS Intel x86_64 (release) 🍎
-        runs-on: macos-13
+        runs-on: macos-15-intel
         needs: test
         steps:
             - uses: actions/checkout@v4
