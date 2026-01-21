@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use needletail::parse_fastx_file;
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
+use std::fs;
 use std::path::Path;
 
 use crate::io::{
@@ -24,12 +25,15 @@ fn process_batch<R: BioRecord>(
     max_mismatches: u32,
     umi_len: usize,
 ) -> Result<(usize, usize)> {
-    // 1. Parallel compute (Heavy lifting)
+    if batch.is_empty() {
+        return Ok((0, 0));
+    }
+
+    // 1. Parallel compute
     let results: Vec<bool> = batch
         .par_iter()
         .map(|rec| {
             if let Some(umi) = crate::extract_umi_from_header(rec.header(), umi_len) {
-                // This is our SIMD-optimized, zero-allocation matcher
                 is_umi_in_read(&umi, rec.seq(), max_mismatches)
             } else {
                 false
@@ -37,7 +41,7 @@ fn process_batch<R: BioRecord>(
         })
         .collect();
 
-    // 2. Serial write (I/O)
+    // 2. Serial write
     let mut removed = 0;
     let mut kept = 0;
     for (rec, matched) in batch.into_iter().zip(results) {
@@ -65,7 +69,18 @@ pub fn process_fastq(
     max_m: u32,
     umi_len: usize,
 ) -> Result<(usize, usize, usize)> {
+    // Check for 0-byte file BEFORE parsing to avoid parser errors/panics
+    if fs::metadata(input)?.len() == 0 {
+        // Create empty output if requested, then return
+        if let Some(p) = kept_out {
+            let _ = create_fastq_writer(p)?;
+        }
+        return Ok((0, 0, 0));
+    }
+
     let mut reader = parse_fastx_file(input).context("Failed to parse FASTX file")?;
+
+    // Initialize writers immediately
     let mut kept_w = match kept_out {
         Some(p) => GenericWriter::Fastq(create_fastq_writer(p)?),
         None => GenericWriter::Sink,
@@ -78,9 +93,12 @@ pub fn process_fastq(
     let mut stats = (0, 0, 0); // total, removed, kept
     let mut batch = Vec::with_capacity(BATCH_SIZE);
 
+    // Standard loop: no need to peek at the first record manually
     while let Some(record) = reader.next() {
         let r = record?;
         stats.0 += 1;
+
+        // Own the data
         batch.push(FastqRecord {
             head: r.id().to_vec(),
             seq: r.seq().to_vec(),
@@ -94,7 +112,8 @@ pub fn process_fastq(
             batch = Vec::with_capacity(BATCH_SIZE);
         }
     }
-    // Final flush...
+
+    // Final flush
     let (r_inc, k_inc) = process_batch(batch, &mut kept_w, &mut rem_w, max_m, umi_len)?;
     stats.1 += r_inc;
     stats.2 += k_inc;
@@ -115,7 +134,21 @@ pub fn process_bam(
     umi_len: usize,
 ) -> Result<(usize, usize, usize)> {
     let mut reader = bam::Reader::from_path(input).context("Failed to open BAM file")?;
+
+    // Read header immediately to setup output writers
     let header = bam::Header::from_template(reader.header());
+
+    // // Peek to see if there are any records. For header-only inputs we want to
+    // // create only the kept output (empty) and return zeros — we do NOT create
+    // // the removed file in that case.
+    // let mut records = reader.records();
+    // let first = records.next();
+    // if first.is_none() {
+    //     if let Some(p) = kept_out {
+    //         let _ = create_bam_writer(p, &header)?;
+    //     }
+    //     return Ok((0, 0, 0));
+    // }
 
     // Note: header is used to initialize writers (if provided)
     let mut kept_w = match kept_out {
@@ -130,6 +163,8 @@ pub fn process_bam(
     let mut stats = (0, 0, 0); // total, removed, kept
     let mut batch = Vec::with_capacity(BATCH_SIZE);
 
+    // Iterate directly. If file is empty (has header but no records),
+    // this loop simply won't run, and we flow to the empty final flush.
     for result in reader.records() {
         let r = result?;
         stats.0 += 1;
@@ -143,7 +178,8 @@ pub fn process_bam(
             batch = Vec::with_capacity(BATCH_SIZE);
         }
     }
-    // Final flush...
+
+    // Final flush
     let (r_inc, k_inc) = process_batch(batch, &mut kept_w, &mut rem_w, max_m, umi_len)?;
     stats.1 += r_inc;
     stats.2 += k_inc;

@@ -190,6 +190,54 @@ fn test_main_cli_bam_processing() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn test_process_fastq_empty_input_creates_empty_kept() -> Result<(), Box<dyn std::error::Error>> {
+    let input = NamedTempFile::new().expect("create temp file");
+    let tmp = tempdir().unwrap();
+    let matched = tmp.path().join("matched.fq");
+    let removed = tmp.path().join("removed.fq");
+
+    let (total, with_umi, without_umi) =
+        umi_checker::processing::process_fastq(input.path(), Some(&matched), Some(&removed), 1, 12)
+            .expect("processing failed");
+
+    assert_eq!(total, 0);
+    assert_eq!(with_umi, 0);
+    assert_eq!(without_umi, 0);
+    assert!(matched.exists());
+    assert_eq!(std::fs::metadata(&matched).unwrap().len(), 0);
+    assert!(!removed.exists());
+
+    Ok(())
+}
+
+#[test]
+fn test_process_bam_empty_input_creates_kept() -> Result<(), Box<dyn std::error::Error>> {
+    use rust_htslib::bam::Read;
+    let tmp = tempdir().unwrap();
+    let input_path = tmp.path().join("empty.sam");
+    std::fs::write(&input_path, b"@HD\tVN:1.0\n").expect("write sam header");
+
+    let matched = tmp.path().join("matched.bam");
+    let removed = tmp.path().join("removed.bam");
+
+    let (total, with_umi, without_umi) =
+        umi_checker::processing::process_bam(&input_path, Some(&matched), Some(&removed), 1, 12)
+            .expect("processing failed");
+
+    assert_eq!(total, 0);
+    assert_eq!(with_umi, 0);
+    assert_eq!(without_umi, 0);
+    assert!(matched.exists());
+    assert!(removed.exists());
+
+    // Ensure matched BAM has zero records
+    let mut reader = rust_htslib::bam::Reader::from_path(&matched)?;
+    assert!(reader.records().next().is_none());
+
+    Ok(())
+}
+
+#[test]
 fn test_main_cli_custom_threads() -> Result<(), Box<dyn std::error::Error>> {
     use assert_cmd::assert::OutputAssertExt;
     use assert_cmd::cargo;
