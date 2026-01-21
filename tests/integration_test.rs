@@ -35,31 +35,29 @@ fn test_process_bam_integration() {
         &data_path,
         Some(matched_tmp.path()),
         Some(removed_tmp.path()),
-        2, // allow 1 mismatch
+        2, // allow 2 mismatches
         12,
     )
     .expect("processing failed");
 
-    // From our small FASTQ: read1 and read2 contain the UMI in the sequence (read3 does not)
+    // From our small BAM file
     assert_eq!(total, 17619);
     assert_eq!(with_umi, 76);
     assert_eq!(without_umi, 17543);
 }
 
-// New CLI integration test using a separate process (avoids rayon global build issues).
+// CLI integration test using a separate process (avoids rayon global build issues).
 #[test]
 fn test_main_cli_writes_outputs_and_prints_summary() -> Result<(), Box<dyn std::error::Error>> {
-    use assert_cmd::assert::OutputAssertExt;
-    use assert_cmd::cargo;
+    use assert_cmd::Command;
     use predicates::prelude::*;
-    use std::process::Command;
 
     let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
     let tmp = tempdir()?;
     let out_prefix = tmp.path().join("outprefix");
 
     // Run the compiled binary and assert it prints the expected summary.
-    let mut cmd = Command::new(cargo::cargo_bin!(env!("CARGO_PKG_NAME"))); // Use the macro, not cargo::cargo_bin
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     cmd.arg("-i")
         .arg(&data_path)
         .arg("-o")
@@ -70,11 +68,166 @@ fn test_main_cli_writes_outputs_and_prints_summary() -> Result<(), Box<dyn std::
         .success()
         .stdout(predicate::str::contains("example.fastq\t3\t2"));
 
-    // Check the output files were written (fastq input -> .fastq outputs)
+    // Check the output files were written (fastq input -> .fq outputs)
     let matched = tmp.path().join("outprefix.fq");
     let removed = tmp.path().join("outprefix.removed.fq");
     assert!(matched.exists());
     assert!(removed.exists());
+
+    Ok(())
+}
+
+#[test]
+fn test_main_cli_verbose_flag() -> Result<(), Box<dyn std::error::Error>> {
+    use assert_cmd::Command;
+    use predicates::prelude::*;
+
+    let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    cmd.arg("-i")
+        .arg(&data_path)
+        .arg("-m")
+        .arg("1")
+        .arg("--verbose");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Elapsed:"));
+
+    Ok(())
+}
+
+#[test]
+fn test_main_cli_no_output_files() -> Result<(), Box<dyn std::error::Error>> {
+    use assert_cmd::Command;
+    use predicates::prelude::*;
+
+    let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
+
+    // Run without --output flag
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    cmd.arg("-i")
+        .arg(&data_path)
+        .arg("-m")
+        .arg("0");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("example.fastq\t3\t"));
+
+    Ok(())
+}
+
+#[test]
+fn test_main_cli_invalid_mismatch() -> Result<(), Box<dyn std::error::Error>> {
+    use assert_cmd::Command;
+
+    let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    cmd.arg("-i")
+        .arg(&data_path)
+        .arg("-m")
+        .arg("5"); // Too high
+
+    cmd.assert()
+        .failure();
+
+    Ok(())
+}
+
+#[test]
+fn test_main_cli_unsupported_file_type() -> Result<(), Box<dyn std::error::Error>> {
+    use assert_cmd::Command;
+    use predicates::prelude::*;
+    use tempfile::NamedTempFile;
+
+    let tmp_file = NamedTempFile::with_suffix(".txt")?;
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    cmd.arg("-i")
+        .arg(tmp_file.path())
+        .arg("-m")
+        .arg("1");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("Unsupported file type"));
+
+    Ok(())
+}
+
+#[test]
+fn test_main_cli_bam_processing() -> Result<(), Box<dyn std::error::Error>> {
+    use assert_cmd::Command;
+    use predicates::prelude::*;
+
+    let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.bam");
+    let tmp = tempdir()?;
+    let out_prefix = tmp.path().join("outprefix");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    cmd.arg("-i")
+        .arg(&data_path)
+        .arg("-o")
+        .arg(&out_prefix)
+        .arg("-m")
+        .arg("2");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("example.bam\t17619\t76"));
+
+    // Check BAM output files were created
+    let matched = tmp.path().join("outprefix.bam");
+    let removed = tmp.path().join("outprefix.removed.bam");
+    assert!(matched.exists());
+    assert!(removed.exists());
+
+    Ok(())
+}
+
+#[test]
+fn test_main_cli_custom_threads() -> Result<(), Box<dyn std::error::Error>> {
+    use assert_cmd::Command;
+    use predicates::prelude::*;
+
+    let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    cmd.arg("-i")
+        .arg(&data_path)
+        .arg("-t")
+        .arg("2")
+        .arg("-m")
+        .arg("1");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("example.fastq\t3\t2"));
+
+    Ok(())
+}
+
+#[test]
+fn test_main_cli_custom_umi_length() -> Result<(), Box<dyn std::error::Error>> {
+    use assert_cmd::Command;
+    use predicates::prelude::*;
+
+    let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    cmd.arg("-i")
+        .arg(&data_path)
+        .arg("-l")
+        .arg("10")
+        .arg("-m")
+        .arg("1");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("example.fastq\t3\t"));
 
     Ok(())
 }

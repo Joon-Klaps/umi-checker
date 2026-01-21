@@ -47,30 +47,23 @@ jobs:
         name: Coverage test 📊
         runs-on: ubuntu-latest
         needs: test
+        container:
+            image: xd009642/tarpaulin:develop-nightly
+            options: --security-opt seccomp=unconfined
         if: "!startsWith(github.ref, 'refs/tags/v')"
         steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-            - name: Setup Rust stable
-              uses: dtolnay/rust-toolchain@stable
-            - name: Setup cache for cargo
-              uses: actions/cache@v3
+            - name: Checkout repository
+              uses: actions/checkout@v2
+
+            - name: Generate code coverage
+              run: |
+                  cargo +nightly tarpaulin --verbose --all-features --workspace --timeout 120 --out xml
+
+            - name: Upload to codecov.io
+              uses: codecov/codecov-action@v5
               with:
-                  path: target
-                  key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-            - name: Install cargo-tarpaulin
-              run: cargo install cargo-tarpaulin --locked --force
-            - name: Measure code coverage
-              run: cargo tarpaulin -v --out Lcov --ciserver github-actions
-            - name: Upload to Codecov
-              uses: codecov/codecov-action@v3
-              with:
-                  files: ./lcov.info
-                  env_vars: OS
                   fail_ci_if_error: false
                   token: ${{ secrets.CODECOV_TOKEN }}
-                  codecov_curl_args: "--globoff"
-                  verbose: true
 
     build-linux-x86_64:
         name: Build Linux x86_64 (release) 🐧

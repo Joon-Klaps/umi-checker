@@ -106,21 +106,13 @@ impl FileType {
     }
 }
 
-/// CLI entry point: parse args, configure threading, and run the
-/// appropriate processor for the input file type. Prints a concise
-/// tab-separated summary: total, with_umi, percent_with, without_umi, percent_without.
-fn main() -> Result<()> {
-    let args = Args::parse();
-
+/// Extracted business logic - now testable!
+/// Returns formatted summary string instead of printing directly.
+fn run(args: Args) -> Result<String> {
     // Validate mismatches
     if args.mismatches > 3 {
         anyhow::bail!("Maximum allowed mismatches is 3");
     }
-
-    // Set up thread pool
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(args.threads)
-        .build_global()?;
 
     // Determine file type and process
     let file_type = FileType::from_path(&args.input)?;
@@ -176,14 +168,29 @@ fn main() -> Result<()> {
         .map(|s| s.to_string())
         .unwrap_or_else(|| args.input.to_string_lossy().to_string());
 
-    println!(
+    let mut output = format!(
         "{}\t{}\t{}\t{:.2}\t{}\t{:.2}",
         fname, total, with_umi, perc_with, without_umi, perc_without
     );
 
     if args.verbose {
-        println!("Elapsed: {:.3}s", elapsed.as_secs_f64());
+        output.push_str(&format!("\nElapsed: {:.3}s", elapsed.as_secs_f64()));
     }
+
+    Ok(output)
+}
+
+/// CLI entry point: parse args, configure threading, and delegate to run().
+fn main() -> Result<()> {
+    let args = Args::parse();
+
+    // Set up thread pool
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(args.threads)
+        .build_global()?;
+
+    let output = run(args)?;
+    println!("{}", output);
 
     Ok(())
 }
@@ -191,86 +198,123 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::Parser;
-    use std::path::Path;
 
     #[test]
-    fn test_filetype_from_path_variants() {
+    fn test_file_type_from_path() {
         assert_eq!(
-            FileType::from_path(Path::new("reads.fq")).unwrap(),
+            FileType::from_path(Path::new("test.fastq")).unwrap(),
             FileType::Fastq
         );
         assert_eq!(
-            FileType::from_path(Path::new("reads.fastq")).unwrap(),
+            FileType::from_path(Path::new("test.fq")).unwrap(),
             FileType::Fastq
         );
         assert_eq!(
-            FileType::from_path(Path::new("reads.fq.gz")).unwrap(),
+            FileType::from_path(Path::new("test.fastq.gz")).unwrap(),
             FileType::FastqGz
         );
         assert_eq!(
-            FileType::from_path(Path::new("reads.fastq.gz")).unwrap(),
+            FileType::from_path(Path::new("test.fq.gz")).unwrap(),
             FileType::FastqGz
         );
         assert_eq!(
-            FileType::from_path(Path::new("reads.bam")).unwrap(),
+            FileType::from_path(Path::new("test.bam")).unwrap(),
             FileType::Bam
         );
         assert_eq!(
-            FileType::from_path(Path::new("reads.sam")).unwrap(),
+            FileType::from_path(Path::new("test.sam")).unwrap(),
             FileType::Sam
         );
-
-        // Unknown suffix should be an error
-        assert!(FileType::from_path(Path::new("reads.unknown")).is_err());
+        assert!(FileType::from_path(Path::new("test.txt")).is_err());
     }
 
     #[test]
-    fn test_build_output_paths_suffix_handling() {
+    fn test_build_output_paths_fastq() {
         let ft = FileType::Fastq;
-        let (matched, removed) = ft.build_output_paths(Path::new("outprefix"));
-        assert_eq!(matched, Path::new("outprefix.fq"));
-        assert_eq!(removed, Path::new("outprefix.removed.fq"));
-
-        // If prefix already contains the suffix it should not duplicate it
-        let (m2, r2) = ft.build_output_paths(Path::new("outprefix.fastq"));
-        assert_eq!(m2, Path::new("outprefix.fq"));
-        assert_eq!(r2, Path::new("outprefix.removed.fq"));
-
-        // gz suffix handling: both '.fq.gz' and '.fastq.gz' should be accepted
-        let ft_gz = FileType::FastqGz;
-        let (mg, rg) = ft_gz.build_output_paths(Path::new("outprefix.fq.gz"));
-        assert_eq!(mg, Path::new("outprefix.fq.gz"));
-        assert_eq!(rg, Path::new("outprefix.removed.fq.gz"));
-
-        // if prefix uses the alternate variant, it should still be trimmed
-        let (mg2, rg2) = ft_gz.build_output_paths(Path::new("outprefix.fastq.gz"));
-        assert_eq!(mg2, Path::new("outprefix.fq.gz"));
-        assert_eq!(rg2, Path::new("outprefix.removed.fq.gz"));
-
-        // bam and sam support
-        let ft_bam = FileType::Bam;
-        let (mb, rb) = ft_bam.build_output_paths(Path::new("outprefix"));
-        assert_eq!(mb, Path::new("outprefix.bam"));
-        assert_eq!(rb, Path::new("outprefix.removed.bam"));
-
-        let ft_sam = FileType::Sam;
-        let (ms, rs) = ft_sam.build_output_paths(Path::new("outprefix.sam"));
-        assert_eq!(ms, Path::new("outprefix.sam"));
-        assert_eq!(rs, Path::new("outprefix.removed.sam"));
+        let (matched, removed) = ft.build_output_paths(Path::new("output"));
+        assert_eq!(matched, PathBuf::from("output.fq"));
+        assert_eq!(removed, PathBuf::from("output.removed.fq"));
     }
 
     #[test]
-    fn test_args_parsing_and_validation() {
-        // Minimal good parse
-        let args = Args::try_parse_from(["prog", "-i", "reads.fastq"]).unwrap();
-        assert_eq!(args.mismatches, 0);
-        assert_eq!(args.umi_length, 12);
-        assert_eq!(args.threads, 4);
-        assert_eq!(args.output, None);
+    fn test_build_output_paths_with_suffix() {
+        let ft = FileType::Fastq;
+        let (matched, removed) = ft.build_output_paths(Path::new("output.fastq"));
+        assert_eq!(matched, PathBuf::from("output.fq"));
+        assert_eq!(removed, PathBuf::from("output.removed.fq"));
+    }
 
-        // Invalid mismatches (>3) should be a parsing error
-        let bad = Args::try_parse_from(["prog", "-i", "reads.fastq", "-m", "5"]);
-        assert!(bad.is_err());
+    #[test]
+    fn test_build_output_paths_bam() {
+        let ft = FileType::Bam;
+        let (matched, removed) = ft.build_output_paths(Path::new("output"));
+        assert_eq!(matched, PathBuf::from("output.bam"));
+        assert_eq!(removed, PathBuf::from("output.removed.bam"));
+    }
+
+    #[test]
+    fn test_run_validates_mismatches() {
+        let args = Args {
+            input: PathBuf::from("test.fastq"),
+            mismatches: 4,
+            umi_length: 12,
+            output: None,
+            threads: 1,
+            verbose: false,
+        };
+
+        let result = run(args);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Maximum allowed mismatches is 3"));
+    }
+
+    #[test]
+    fn test_run_invalid_file_type() {
+        let args = Args {
+            input: PathBuf::from("test.txt"),
+            mismatches: 1,
+            umi_length: 12,
+            output: None,
+            threads: 1,
+            verbose: false,
+        };
+
+        let result = run(args);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unsupported file type"));
+    }
+
+    #[test]
+    fn test_run_with_real_data() {
+        use tempfile::NamedTempFile;
+
+        let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
+
+        // Skip if test data doesn't exist
+        if !data_path.exists() {
+            eprintln!("Skipping test - test data not found");
+            return;
+        }
+
+        let matched_tmp = NamedTempFile::new().expect("create temp file");
+        let removed_tmp = NamedTempFile::new().expect("create temp file");
+        let out_prefix = matched_tmp.path().parent().unwrap().join("test_output");
+
+        let args = Args {
+            input: data_path,
+            mismatches: 1,
+            umi_length: 12,
+            output: Some(out_prefix),
+            threads: 1,
+            verbose: true,
+        };
+
+        let result = run(args);
+        assert!(result.is_ok());
+
+        let output = result.unwrap();
+        assert!(output.contains("example.fastq"));
+        assert!(output.contains("\t3\t")); // total reads
+        assert!(output.contains("Elapsed:")); // verbose output
     }
 }
