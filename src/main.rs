@@ -265,7 +265,10 @@ mod tests {
 
         let result = run(args);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Maximum allowed mismatches is 3"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Maximum allowed mismatches is 3"));
     }
 
     #[test]
@@ -281,7 +284,10 @@ mod tests {
 
         let result = run(args);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unsupported file type"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unsupported file type"));
     }
 
     #[test]
@@ -297,7 +303,6 @@ mod tests {
         }
 
         let matched_tmp = NamedTempFile::new().expect("create temp file");
-        let removed_tmp = NamedTempFile::new().expect("create temp file");
         let out_prefix = matched_tmp.path().parent().unwrap().join("test_output");
 
         let args = Args {

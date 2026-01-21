@@ -49,15 +49,17 @@ fn test_process_bam_integration() {
 // CLI integration test using a separate process (avoids rayon global build issues).
 #[test]
 fn test_main_cli_writes_outputs_and_prints_summary() -> Result<(), Box<dyn std::error::Error>> {
-    use assert_cmd::Command;
+    use assert_cmd::assert::OutputAssertExt;
+    use assert_cmd::cargo;
     use predicates::prelude::*;
+    use std::process::Command;
 
     let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
     let tmp = tempdir()?;
     let out_prefix = tmp.path().join("outprefix");
 
     // Run the compiled binary and assert it prints the expected summary.
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    let mut cmd = Command::new(cargo::cargo_bin!(env!("CARGO_PKG_NAME")));
     cmd.arg("-i")
         .arg(&data_path)
         .arg("-o")
@@ -79,12 +81,14 @@ fn test_main_cli_writes_outputs_and_prints_summary() -> Result<(), Box<dyn std::
 
 #[test]
 fn test_main_cli_verbose_flag() -> Result<(), Box<dyn std::error::Error>> {
-    use assert_cmd::Command;
+    use assert_cmd::assert::OutputAssertExt;
+    use assert_cmd::cargo;
     use predicates::prelude::*;
+    use std::process::Command;
 
     let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    let mut cmd = Command::new(cargo::cargo_bin!(env!("CARGO_PKG_NAME")));
     cmd.arg("-i")
         .arg(&data_path)
         .arg("-m")
@@ -100,17 +104,16 @@ fn test_main_cli_verbose_flag() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_main_cli_no_output_files() -> Result<(), Box<dyn std::error::Error>> {
-    use assert_cmd::Command;
+    use assert_cmd::assert::OutputAssertExt;
+    use assert_cmd::cargo;
     use predicates::prelude::*;
+    use std::process::Command;
 
     let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
 
     // Run without --output flag
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
-    cmd.arg("-i")
-        .arg(&data_path)
-        .arg("-m")
-        .arg("0");
+    let mut cmd = Command::new(cargo::cargo_bin!(env!("CARGO_PKG_NAME")));
+    cmd.arg("-i").arg(&data_path).arg("-m").arg("0");
 
     cmd.assert()
         .success()
@@ -121,35 +124,31 @@ fn test_main_cli_no_output_files() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_main_cli_invalid_mismatch() -> Result<(), Box<dyn std::error::Error>> {
-    use assert_cmd::Command;
+    use assert_cmd::assert::OutputAssertExt;
+    use assert_cmd::cargo;
+    use std::process::Command;
 
     let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
-    cmd.arg("-i")
-        .arg(&data_path)
-        .arg("-m")
-        .arg("5"); // Too high
+    let mut cmd = Command::new(cargo::cargo_bin!(env!("CARGO_PKG_NAME")));
+    cmd.arg("-i").arg(&data_path).arg("-m").arg("5"); // Too high
 
-    cmd.assert()
-        .failure();
+    cmd.assert().failure();
 
     Ok(())
 }
 
 #[test]
 fn test_main_cli_unsupported_file_type() -> Result<(), Box<dyn std::error::Error>> {
-    use assert_cmd::Command;
+    use assert_cmd::assert::OutputAssertExt;
+    use assert_cmd::cargo;
     use predicates::prelude::*;
-    use tempfile::NamedTempFile;
+    use std::process::Command;
 
     let tmp_file = NamedTempFile::with_suffix(".txt")?;
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
-    cmd.arg("-i")
-        .arg(tmp_file.path())
-        .arg("-m")
-        .arg("1");
+    let mut cmd = Command::new(cargo::cargo_bin!(env!("CARGO_PKG_NAME")));
+    cmd.arg("-i").arg(tmp_file.path()).arg("-m").arg("1");
 
     cmd.assert()
         .failure()
@@ -160,14 +159,16 @@ fn test_main_cli_unsupported_file_type() -> Result<(), Box<dyn std::error::Error
 
 #[test]
 fn test_main_cli_bam_processing() -> Result<(), Box<dyn std::error::Error>> {
-    use assert_cmd::Command;
+    use assert_cmd::assert::OutputAssertExt;
+    use assert_cmd::cargo;
     use predicates::prelude::*;
+    use std::process::Command;
 
     let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.bam");
     let tmp = tempdir()?;
     let out_prefix = tmp.path().join("outprefix");
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    let mut cmd = Command::new(cargo::cargo_bin!(env!("CARGO_PKG_NAME")));
     cmd.arg("-i")
         .arg(&data_path)
         .arg("-o")
@@ -190,12 +191,14 @@ fn test_main_cli_bam_processing() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_main_cli_custom_threads() -> Result<(), Box<dyn std::error::Error>> {
-    use assert_cmd::Command;
+    use assert_cmd::assert::OutputAssertExt;
+    use assert_cmd::cargo;
     use predicates::prelude::*;
+    use std::process::Command;
 
     let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    let mut cmd = Command::new(cargo::cargo_bin!(env!("CARGO_PKG_NAME")));
     cmd.arg("-i")
         .arg(&data_path)
         .arg("-t")
@@ -212,12 +215,14 @@ fn test_main_cli_custom_threads() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_main_cli_custom_umi_length() -> Result<(), Box<dyn std::error::Error>> {
-    use assert_cmd::Command;
+    use assert_cmd::assert::OutputAssertExt;
+    use assert_cmd::cargo;
     use predicates::prelude::*;
+    use std::process::Command;
 
-    let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
+    let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.umi10.fastq");
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    let mut cmd = Command::new(cargo::cargo_bin!(env!("CARGO_PKG_NAME")));
     cmd.arg("-i")
         .arg(&data_path)
         .arg("-l")
@@ -227,7 +232,7 @@ fn test_main_cli_custom_umi_length() -> Result<(), Box<dyn std::error::Error>> {
 
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("example.fastq\t3\t"));
+        .stdout(predicate::str::contains("example.umi10.fastq\t3\t"));
 
     Ok(())
 }
