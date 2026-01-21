@@ -78,7 +78,17 @@ pub fn process_fastq(
         return Ok((0, 0, 0));
     }
 
-    let mut reader = parse_fastx_file(input).context("Failed to parse FASTX file")?;
+    let mut reader = match parse_fastx_file(input) {
+        Ok(r) => r,
+        // If the file is empty the parser returns ParseErrorKind::EmptyFile
+        Err(e) if e.kind == needletail::errors::ParseErrorKind::EmptyFile => {
+            return Ok((0, 0, 0));
+        }
+        Err(e) => {
+            // Any other parse error is fatal
+            return Err(e).context("Failed to parse FASTX file");
+        }
+    };
 
     // Initialize writers immediately
     let mut kept_w = match kept_out {
@@ -137,18 +147,6 @@ pub fn process_bam(
 
     // Read header immediately to setup output writers
     let header = bam::Header::from_template(reader.header());
-
-    // // Peek to see if there are any records. For header-only inputs we want to
-    // // create only the kept output (empty) and return zeros — we do NOT create
-    // // the removed file in that case.
-    // let mut records = reader.records();
-    // let first = records.next();
-    // if first.is_none() {
-    //     if let Some(p) = kept_out {
-    //         let _ = create_bam_writer(p, &header)?;
-    //     }
-    //     return Ok((0, 0, 0));
-    // }
 
     // Note: header is used to initialize writers (if provided)
     let mut kept_w = match kept_out {
