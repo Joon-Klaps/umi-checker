@@ -1,7 +1,7 @@
 # 🔍 umi-checker
 
-[![CI](https://github.com/Joon-Klaps/umi-checker/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Joon-Klaps/umi-checker/actions)
-[![codecov](https://codecov.io/gh/Joon-Klaps/umi-checker/branch/main/graph/badge.svg?token=B85ASO3QRZ)](https://codecov.io/gh/Joon-Klaps/umi-checker)
+[![CI](https://github.com/Joon-Klaps/umi-checker/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Joon-Klaps/umi-checker/actions)
+[![codecov](https://codecov.io/gh/Joon-Klaps/umi-checker/branch/master/graph/badge.svg?token=B85ASO3QRZ)](https://codecov.io/gh/Joon-Klaps/umi-checker)
 
 A small, fast CLI tool for checking the presence of UMIs (Unique Molecular Identifiers) in fastq files or BAM files.
 
