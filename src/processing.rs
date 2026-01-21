@@ -151,13 +151,12 @@ pub fn process_bam(
     Ok(stats)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::io::FastqRecord;
-    use std::sync::{Arc, Mutex};
     use std::io::{Result as IoResult, Write};
+    use std::sync::{Arc, Mutex};
 
     /// Small writer that appends into an Arc<Mutex<Vec<u8>>> so tests can
     /// inspect written bytes after the function under test owns the writer.
@@ -176,8 +175,16 @@ mod tests {
     #[test]
     fn test_process_batch_fastq_routing() {
         let batch = vec![
-            FastqRecord { head: b"r1:ACGT".to_vec(), seq: b"XXXXACGTYYYY".to_vec(), qual: None },
-            FastqRecord { head: b"r2:TTTT".to_vec(), seq: b"AAAAAAAA".to_vec(), qual: None },
+            FastqRecord {
+                head: b"r1:ACGT".to_vec(),
+                seq: b"XXXXACGTYYYY".to_vec(),
+                qual: None,
+            },
+            FastqRecord {
+                head: b"r2:TTTT".to_vec(),
+                seq: b"AAAAAAAA".to_vec(),
+                qual: None,
+            },
         ];
 
         let kept_buf = Arc::new(Mutex::new(Vec::new()));
@@ -185,14 +192,15 @@ mod tests {
         let mut kept_writer = GenericWriter::Fastq(Box::new(SharedWriter(kept_buf.clone())));
         let mut rem_writer = GenericWriter::Fastq(Box::new(SharedWriter(rem_buf.clone())));
 
-        let (removed, kept) = process_batch(batch, &mut kept_writer, &mut rem_writer, 0, 4).unwrap();
+        let (removed, kept) =
+            process_batch(batch, &mut kept_writer, &mut rem_writer, 0, 4).unwrap();
         assert_eq!(removed, 1);
         assert_eq!(kept, 1);
 
         let k = kept_buf.lock().unwrap();
         let r = rem_buf.lock().unwrap();
-        assert!(k.len() > 0);
-        assert!(r.len() > 0);
+        assert!(!k.is_empty());
+        assert!(!r.is_empty());
         // Check the removed writer contains the expected FASTQ header
         assert!(String::from_utf8_lossy(&r).contains("@r1:ACGT"));
     }

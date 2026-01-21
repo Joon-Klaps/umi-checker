@@ -146,7 +146,6 @@ pub fn is_umi_in_read(umi: &[u8], read: &[u8], max_mismatches: u32) -> bool {
         .any(|window| has_matching_chunk(window) && hamming_distance(umi, window) <= max_mismatches)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -117,12 +117,11 @@ pub fn create_bam_writer(path: &Path, header: &bam::Header) -> Result<bam::Write
     bam::Writer::from_path(path, header, bam::Format::Bam).context("Failed to create BAM writer")
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
     use std::io::{Result as IoResult, Write};
+    use std::sync::{Arc, Mutex};
 
     struct SharedWriter(Arc<Mutex<Vec<u8>>>);
     impl Write for SharedWriter {
@@ -131,7 +130,9 @@ mod tests {
             m.extend_from_slice(buf);
             Ok(buf.len())
         }
-        fn flush(&mut self) -> IoResult<()> { Ok(()) }
+        fn flush(&mut self) -> IoResult<()> {
+            Ok(())
+        }
     }
 
     #[test]
@@ -139,7 +140,9 @@ mod tests {
         let buf = Arc::new(Mutex::new(Vec::new()));
         let mut writer = GenericWriter::Fastq(Box::new(SharedWriter(buf.clone())));
 
-        writer.write_fastq(b"read1", b"ACGT", Some(b"!!!!")).unwrap();
+        writer
+            .write_fastq(b"read1", b"ACGT", Some(b"!!!!"))
+            .unwrap();
 
         let output = buf.lock().unwrap();
         let s = String::from_utf8_lossy(&output);
