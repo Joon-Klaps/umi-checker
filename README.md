@@ -10,6 +10,9 @@ A small, fast CLI tool for checking the presence of UMIs (Unique Molecular Ident
 You can install the latest release with a single command:
 
 ```bash
+cargo install --git https://github.com/Joon-Klaps/umi-checker.git
+
+## Alternativly download prebuild libraries
 curl -fsSL https://raw.githubusercontent.com/Joon-Klaps/umi-checker/master/install.sh | bash
 ```
 
