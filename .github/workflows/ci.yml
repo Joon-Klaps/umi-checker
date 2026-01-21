@@ -83,7 +83,7 @@ jobs:
                   path: dist/*
 
     build-linux-aarch64:
-        name: Build Linux aarch64 (release) 🐧
+        name: Build Linux ARM64 / AArch64 (release) 🐧
         runs-on: ubuntu-24.04-arm
         needs: test
         steps:
