@@ -71,8 +71,8 @@ fn test_main_cli_writes_outputs_and_prints_summary() -> Result<(), Box<dyn std::
         .stdout(predicate::str::contains("example.fastq\t3\t2"));
 
     // Check the output files were written (fastq input -> .fastq outputs)
-    let matched = tmp.path().join("outprefix.fastq");
-    let removed = tmp.path().join("outprefix.removed.fastq");
+    let matched = tmp.path().join("outprefix.fq");
+    let removed = tmp.path().join("outprefix.removed.fq");
     assert!(matched.exists());
     assert!(removed.exists());
 
