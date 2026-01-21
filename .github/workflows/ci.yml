@@ -70,11 +70,12 @@ jobs:
               run: |
                   VERSION=$(grep '^version' Cargo.toml | head -n1 | sed -E 's/version = "([^"]+)"/\1/')
                   mkdir -p dist
-                  cp target/release/${{ env.CRATE }} dist/
-                  strip dist/${{ env.CRATE }} || true
+
                   # Prepare Raw Binary
                   cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Linux-x86_64
-                  zip -j "dist/${{ env.CRATE }}-${VERSION}-linux-x86_64.zip" dist/${{ env.CRATE }}
+
+                  # Create zip
+                  zip -j "dist/${{ env.CRATE }}-${VERSION}-linux-x86_64.zip" dist/${{ env.CRATE }}-Linux-x86_64
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
@@ -110,14 +111,11 @@ jobs:
                   VERSION=$(grep '^version' Cargo.toml | head -n1 | sed -E 's/version = "([^"]+)"/\1/')
                   mkdir -p dist
 
-                  # Build artifacts are at target/release on the runner
-                  cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}
-
-                  # Prepare Raw Binary
+                  # Prepare Raw Binaries (both naming conventions)
                   cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Linux-aarch64
                   cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Linux-arm64
 
-                  # Zip correctly named binaries
+                  # Create zips using the binaries
                   zip -j "dist/${{ env.CRATE }}-${VERSION}-linux-aarch64.zip" dist/${{ env.CRATE }}-Linux-aarch64
                   zip -j "dist/${{ env.CRATE }}-${VERSION}-linux-arm64.zip" dist/${{ env.CRATE }}-Linux-arm64
 
@@ -149,9 +147,11 @@ jobs:
               run: |
                   VERSION=$(grep '^version' Cargo.toml | head -n1 | sed -E 's/version = "([^"]+)"/\1/')
                   mkdir -p dist
-                  cp target/x86_64-apple-darwin/release/${{ env.CRATE }} dist/${{ env.CRATE }}
+
                   # Prepare Raw Binary
                   cp target/x86_64-apple-darwin/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Darwin-x86_64
+
+                  # Create zip
                   zip -j "dist/${{ env.CRATE }}-${VERSION}-macos-x86_64.zip" dist/${{ env.CRATE }}-Darwin-x86_64
 
             - name: Upload artifact
@@ -185,14 +185,11 @@ jobs:
 
                   BIN=target/aarch64-apple-darwin/release/${{ env.CRATE }}
 
-                  # Base binary
-                  cp "$BIN" dist/${{ env.CRATE }}
-
-                  # Aliases
+                  # Prepare Raw Binaries (both naming conventions)
                   cp "$BIN" dist/${{ env.CRATE }}-Darwin-aarch64
                   cp "$BIN" dist/${{ env.CRATE }}-Darwin-arm64
 
-                  # Zip correctly named binaries
+                  # Create zips using the binaries
                   zip -j "dist/${{ env.CRATE }}-${VERSION}-macos-aarch64.zip" dist/${{ env.CRATE }}-Darwin-aarch64
                   zip -j "dist/${{ env.CRATE }}-${VERSION}-macos-arm64.zip" dist/${{ env.CRATE }}-Darwin-arm64
 
