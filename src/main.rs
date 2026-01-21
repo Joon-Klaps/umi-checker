@@ -37,7 +37,7 @@ struct Args {
     verbose: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum FileType {
     Fastq,
     FastqGz,
@@ -200,4 +200,60 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+    use std::path::Path;
+
+    #[test]
+    fn test_filetype_from_path_variants() {
+        assert_eq!(FileType::from_path(Path::new("reads.fq")).unwrap(), FileType::Fastq);
+        assert_eq!(FileType::from_path(Path::new("reads.fastq")).unwrap(), FileType::Fastq);
+        assert_eq!(FileType::from_path(Path::new("reads.fq.gz")).unwrap(), FileType::FastqGz);
+        assert_eq!(FileType::from_path(Path::new("reads.fastq.gz")).unwrap(), FileType::FastqGz);
+        assert_eq!(FileType::from_path(Path::new("reads.bam")).unwrap(), FileType::Bam);
+        assert_eq!(FileType::from_path(Path::new("reads.sam")).unwrap(), FileType::Sam);
+
+        // Unknown suffix should be an error
+        assert!(FileType::from_path(Path::new("reads.unknown")).is_err());
+    }
+
+    #[test]
+    fn test_build_output_paths_suffix_handling() {
+        let input = Path::new("sample.fastq");
+        let out_prefix = Path::new("outprefix");
+        let (matched, removed) = build_output_paths(input, out_prefix).unwrap();
+        assert_eq!(matched, Path::new("outprefix.fastq"));
+        assert_eq!(removed, Path::new("outprefix.removed.fastq"));
+
+        // If prefix already contains the suffix it should not duplicate it
+        let out_prefix2 = Path::new("outprefix.fastq");
+        let (m2, r2) = build_output_paths(input, out_prefix2).unwrap();
+        assert_eq!(m2, Path::new("outprefix.fastq"));
+        assert_eq!(r2, Path::new("outprefix.removed.fastq"));
+
+        // gz suffix handling
+        let input_gz = Path::new("reads.fq.gz");
+        let (mg, rg) = build_output_paths(input_gz, Path::new("outprefix.fq.gz")).unwrap();
+        assert_eq!(mg, Path::new("outprefix.fq.gz"));
+        assert_eq!(rg, Path::new("outprefix.removed.fq.gz"));
+    }
+
+    #[test]
+    fn test_args_parsing_and_validation() {
+        // Minimal good parse
+        let args = Args::try_parse_from(&["prog", "-i", "reads.fastq"]).unwrap();
+        assert_eq!(args.mismatches, 0);
+        assert_eq!(args.umi_length, 12);
+        assert_eq!(args.threads, 4);
+        assert_eq!(args.output, None);
+
+        // Invalid mismatches (>3) should be a parsing error
+        let bad = Args::try_parse_from(&["prog", "-i", "reads.fastq", "-m", "5"]);
+        assert!(bad.is_err());
+    }
 }
