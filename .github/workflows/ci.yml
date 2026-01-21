@@ -109,11 +109,17 @@ jobs:
               run: |
                   VERSION=$(grep '^version' Cargo.toml | head -n1 | sed -E 's/version = "([^"]+)"/\1/')
                   mkdir -p dist
+
+                  # Build artifacts are at target/release on the runner
                   cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}
-                  strip dist/${{ env.CRATE }} || true
+
                   # Prepare Raw Binary
                   cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Linux-aarch64
-                  zip -j "dist/${{ env.CRATE }}-${VERSION}-linux-aarch64.zip" dist/${{ env.CRATE }}
+                  cp target/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Linux-arm64
+
+                  # Zip correctly named binaries
+                  zip -j "dist/${{ env.CRATE }}-${VERSION}-linux-aarch64.zip" dist/${{ env.CRATE }}-Linux-aarch64
+                  zip -j "dist/${{ env.CRATE }}-${VERSION}-linux-arm64.zip" dist/${{ env.CRATE }}-Linux-arm64
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
@@ -121,8 +127,8 @@ jobs:
                   name: ${{ env.CRATE }}-linux-aarch64
                   path: dist/*
 
-    build-macos-intel:
-        name: Build macOS Intel x86_64 (release) 🍎
+    build-macos-x86_64:
+        name: Build macOS x86_64 (release) 🍎
         runs-on: macos-15-intel
         needs: test
         steps:
@@ -146,16 +152,16 @@ jobs:
                   cp target/x86_64-apple-darwin/release/${{ env.CRATE }} dist/${{ env.CRATE }}
                   # Prepare Raw Binary
                   cp target/x86_64-apple-darwin/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Darwin-x86_64
-                  zip -j "dist/${{ env.CRATE }}-${VERSION}-macos-x86_64.zip" dist/${{ env.CRATE }}
+                  zip -j "dist/${{ env.CRATE }}-${VERSION}-macos-x86_64.zip" dist/${{ env.CRATE }}-Darwin-x86_64
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: ${{ env.CRATE }}-macos-intel
+                  name: ${{ env.CRATE }}-macos-x86_64
                   path: dist/*
 
     build-macos-arm:
-        name: Build macOS ARM64 (release) 🍎
+        name: Build macOS ARM64 / AArch64 (release) 🍎
         runs-on: macos-latest
         needs: test
         steps:
@@ -168,7 +174,7 @@ jobs:
                   toolchain: stable
                   target: aarch64-apple-darwin
 
-            - name: Build release for ARM64
+            - name: Build release for ARM
               run: |
                   cargo build --release --target aarch64-apple-darwin
 
@@ -176,10 +182,19 @@ jobs:
               run: |
                   VERSION=$(grep '^version' Cargo.toml | head -n1 | sed -E 's/version = "([^"]+)"/\1/')
                   mkdir -p dist
-                  cp target/aarch64-apple-darwin/release/${{ env.CRATE }} dist/${{ env.CRATE }}
-                  # Prepare Raw Binary
-                  cp target/aarch64-apple-darwin/release/${{ env.CRATE }} dist/${{ env.CRATE }}-Darwin-aarch64
-                  zip -j "dist/${{ env.CRATE }}-${VERSION}-macos-aarch64.zip" dist/${{ env.CRATE }}
+
+                  BIN=target/aarch64-apple-darwin/release/${{ env.CRATE }}
+
+                  # Base binary
+                  cp "$BIN" dist/${{ env.CRATE }}
+
+                  # Aliases
+                  cp "$BIN" dist/${{ env.CRATE }}-Darwin-aarch64
+                  cp "$BIN" dist/${{ env.CRATE }}-Darwin-arm64
+
+                  # Zip correctly named binaries
+                  zip -j "dist/${{ env.CRATE }}-${VERSION}-macos-aarch64.zip" dist/${{ env.CRATE }}-Darwin-aarch64
+                  zip -j "dist/${{ env.CRATE }}-${VERSION}-macos-arm64.zip" dist/${{ env.CRATE }}-Darwin-arm64
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
@@ -190,7 +205,7 @@ jobs:
     release:
         name: Create GitHub Release (tag) 🚀
         runs-on: ubuntu-latest
-        needs: [build-linux-x86_64, build-linux-aarch64, build-macos-intel, build-macos-arm]
+        needs: [build-linux-x86_64, build-linux-aarch64, build-macos-x86_64, build-macos-arm]
         if: startsWith(github.ref, 'refs/tags/')
         permissions:
             contents: write
@@ -209,10 +224,10 @@ jobs:
                   name: ${{ env.CRATE }}-linux-aarch64
                   path: artifacts
 
-            - name: Download macOS Intel artifact
+            - name: Download macOS x86_64 artifact
               uses: actions/download-artifact@v4
               with:
-                  name: ${{ env.CRATE }}-macos-intel
+                  name: ${{ env.CRATE }}-macos-x86_64
                   path: artifacts
 
             - name: Download macOS ARM artifact
