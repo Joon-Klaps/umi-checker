@@ -26,12 +26,13 @@ echo
 # --------------------------------------------------
 INSTALL_DIR="${DEFAULT_INSTALL_DIR}"
 
-if [[ -t 0 ]]; then
-  echo "Where do you want to install ${BINARY_NAME}?"
-  echo "Press Enter to use default:"
-  echo "  ${DEFAULT_INSTALL_DIR}"
-  echo "Or enter a custom path (use '.' for current directory)"
-  read -r -p "> " USER_INPUT
+# Check if stderr is a terminal (works with piped stdin)
+if [[ -t 2 ]]; then
+  echo "Where do you want to install ${BINARY_NAME}?" >&2
+  echo "Press Enter to use default:" >&2
+  echo "  ${DEFAULT_INSTALL_DIR}" >&2
+  echo "Or enter a custom path (use '.' for current directory)" >&2
+  read -r -p "> " USER_INPUT </dev/tty
 
   if [[ -n "${USER_INPUT}" ]]; then
     if [[ "${USER_INPUT}" == "." ]]; then
