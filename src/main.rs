@@ -89,30 +89,27 @@ fn build_output_paths(
         .ok_or_else(|| anyhow::anyhow!("Invalid input file name"))?
         .to_lowercase();
 
-    let suffix = if fname.ends_with(".fq.gz") {
-        "fq.gz"
-    } else if fname.ends_with(".fastq.gz") {
-        "fastq.gz"
-    } else if fname.ends_with(".fq") {
-        "fq"
-    } else if fname.ends_with(".fastq") {
-        "fastq"
-    } else if fname.ends_with(".bam") {
-        "bam"
-    } else if fname.ends_with(".sam") {
-        "sam"
-    } else {
-        anyhow::bail!("Unsupported input file type: {}", fname)
-    };
+    // Determine canonical suffix and list of acceptable suffix variants to trim from provided prefix.
+    let (suffix, candidates): (&str, &[&str]) =
+        if fname.ends_with(".fq.gz") || fname.ends_with(".fastq.gz") {
+            ("fq.gz", &[".fq.gz", ".fastq.gz"])
+        } else if fname.ends_with(".fq") || fname.ends_with(".fastq") {
+            ("fq", &[".fq", ".fastq"])
+        } else if fname.ends_with(".bam") {
+            ("bam", &[".bam"])
+        } else if fname.ends_with(".sam") {
+            ("sam", &[".sam"])
+        } else {
+            anyhow::bail!("Unsupported input file type: {}", fname)
+        };
 
     let prefix_str = out_prefix.to_string_lossy();
-    let base = if prefix_str.ends_with(&format!(".{}", suffix)) {
-        prefix_str
-            .trim_end_matches(&format!(".{}", suffix))
-            .to_string()
-    } else {
-        prefix_str.to_string()
-    };
+    // If the prefix ends with any of the acceptable variants, trim that variant.
+    let base = candidates
+        .iter()
+        .find(|s| prefix_str.ends_with(*s))
+        .map(|s| prefix_str.trim_end_matches(*s).to_string())
+        .unwrap_or_else(|| prefix_str.to_string());
 
     let matched = std::path::PathBuf::from(format!("{}.{}", base, suffix));
     let removed = std::path::PathBuf::from(format!("{}.removed.{}", base, suffix));
@@ -253,11 +250,27 @@ mod tests {
         assert_eq!(m2, Path::new("outprefix.fastq"));
         assert_eq!(r2, Path::new("outprefix.removed.fastq"));
 
-        // gz suffix handling
+        // gz suffix handling: both '.fq.gz' and '.fastq.gz' should be accepted and normalized to 'fq.gz'
         let input_gz = Path::new("reads.fq.gz");
         let (mg, rg) = build_output_paths(input_gz, Path::new("outprefix.fq.gz")).unwrap();
         assert_eq!(mg, Path::new("outprefix.fq.gz"));
         assert_eq!(rg, Path::new("outprefix.removed.fq.gz"));
+
+        // if prefix uses the alternate variant, it should still be trimmed and normalized
+        let (mg2, rg2) = build_output_paths(input_gz, Path::new("outprefix.fastq.gz")).unwrap();
+        assert_eq!(mg2, Path::new("outprefix.fq.gz"));
+        assert_eq!(rg2, Path::new("outprefix.removed.fq.gz"));
+
+        // bam and sam support
+        let input_bam = Path::new("reads.bam");
+        let (mb, rb) = build_output_paths(input_bam, Path::new("outprefix")).unwrap();
+        assert_eq!(mb, Path::new("outprefix.bam"));
+        assert_eq!(rb, Path::new("outprefix.removed.bam"));
+
+        let input_sam = Path::new("reads.sam");
+        let (ms, rs) = build_output_paths(input_sam, Path::new("outprefix.sam")).unwrap();
+        assert_eq!(ms, Path::new("outprefix.sam"));
+        assert_eq!(rs, Path::new("outprefix.removed.sam"));
     }
 
     #[test]

@@ -1,4 +1,5 @@
 use std::path::Path;
+use tempfile::tempdir;
 use tempfile::NamedTempFile;
 
 #[test]
@@ -43,4 +44,37 @@ fn test_process_bam_integration() {
     assert_eq!(total, 17619);
     assert_eq!(with_umi, 76);
     assert_eq!(without_umi, 17543);
+}
+
+// New CLI integration test using a separate process (avoids rayon global build issues).
+#[test]
+fn test_main_cli_writes_outputs_and_prints_summary() -> Result<(), Box<dyn std::error::Error>> {
+    use assert_cmd::assert::OutputAssertExt;
+    use assert_cmd::cargo;
+    use predicates::prelude::*;
+    use std::process::Command;
+
+    let data_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/example.fastq");
+    let tmp = tempdir()?;
+    let out_prefix = tmp.path().join("outprefix");
+
+    // Run the compiled binary and assert it prints the expected summary.
+    let mut cmd = Command::new(cargo::cargo_bin!(env!("CARGO_PKG_NAME"))); // Use the macro, not cargo::cargo_bin
+    cmd.arg("-i")
+        .arg(&data_path)
+        .arg("-o")
+        .arg(&out_prefix)
+        .arg("-m")
+        .arg("1");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("example.fastq\t3\t2"));
+
+    // Check the output files were written (fastq input -> .fastq outputs)
+    let matched = tmp.path().join("outprefix.fastq");
+    let removed = tmp.path().join("outprefix.removed.fastq");
+    assert!(matched.exists());
+    assert!(removed.exists());
+
+    Ok(())
 }
