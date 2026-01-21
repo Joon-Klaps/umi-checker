@@ -7,7 +7,7 @@ A small, fast CLI tool for checking the presence of UMIs (Unique Molecular Ident
 You can install the latest release with a single command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Joon-Klaps/umi-checker/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Joon-Klaps/umi-checker/master/install.sh | bash
 ```
 
 ```bash
