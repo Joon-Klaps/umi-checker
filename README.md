@@ -1,8 +1,11 @@
-# umi-checker
+# 🔍 umi-checker
+
+[![CI](https://github.com/Joon-Klaps/umi-checker/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Joon-Klaps/umi-checker/actions)
+[![codecov](https://codecov.io/gh/Joon-Klaps/umi-checker/branch/main/graph/badge.svg?token=B85ASO3QRZ)](https://codecov.io/gh/Joon-Klaps/umi-checker)
 
 A small, fast CLI tool for checking the presence of UMIs (Unique Molecular Identifiers) in fastq files or BAM files.
 
-## Quick Start ✅
+## 🦀 Quick Start
 
 You can install the latest release with a single command:
 
@@ -48,10 +51,10 @@ done
 
 If you only want a tab-separated summary on stdout (for aggregating across many files) and don't want output files created, omit `--output`. The tool will print a single line with the input filename as the first column and will not write any output files.
 
-## Contributing 🧑‍💻
+## 🧑‍💻 Contributing
 
 Contributions are welcome! Please open an issue or a pull request with a clear description of the change and tests when applicable.
 
-## License
+## ⚖️ License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

@@ -41,4 +41,34 @@ mod tests {
         let umi = extract_umi_from_header(header, 12);
         assert_eq!(umi.unwrap(), b"ACGTACGTACGT");
     }
+
+    #[test]
+    #[should_panic(expected = "UMI length does not match")]
+    fn test_extract_umi_panics_on_wrong_length() {
+        // The token after ':' has length 4 but we request 6 -> panic
+        let header = b"READ:ACGT";
+        extract_umi_from_header(header, 6);
+    }
+
+    #[test]
+    fn test_extract_umi_with_colon_and_underscore() {
+        let header1 = b"ID:aaaacccc";
+        let umi1 = extract_umi_from_header(header1, 8).unwrap();
+        assert_eq!(umi1, b"AAAACCCC");
+
+        let header2 = b"ID_gggttt";
+        let umi2 = extract_umi_from_header(header2, 6).unwrap();
+        assert_eq!(umi2, b"GGGTTT");
+    }
+
+    #[test]
+    fn test_extract_umi_with_space_colon_and_underscore() {
+        let header1 = b"ID:aaaacccc some other info:aaa";
+        let umi1 = extract_umi_from_header(header1, 8).unwrap();
+        assert_eq!(umi1, b"AAAACCCC");
+
+        let header2 = b"ID_gggttt additional_info";
+        let umi2 = extract_umi_from_header(header2, 6).unwrap();
+        assert_eq!(umi2, b"GGGTTT");
+    }
 }

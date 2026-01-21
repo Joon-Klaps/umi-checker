@@ -145,3 +145,35 @@ pub fn is_umi_in_read(umi: &[u8], read: &[u8], max_mismatches: u32) -> bool {
     read.windows(umi_len)
         .any(|window| has_matching_chunk(window) && hamming_distance(umi, window) <= max_mismatches)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hamming_distance_exact() {
+        let a = b"ACGTACGT";
+        let b = b"ACGTACGT";
+        assert_eq!(hamming_distance(a, b), 0);
+    }
+
+    #[test]
+    fn test_hamming_distance_with_n_and_tail() {
+        let a = b"ACGTNACGTA";
+        let b = b"ACGTAACGTT";
+        // 'N' counts as mismatch; expect two mismatches
+        assert_eq!(hamming_distance(a, b), 2);
+    }
+
+    #[test]
+    fn test_is_umi_in_read_exact_and_mismatch() {
+        let umi = b"ACGTACGTACGT"; // 12
+        let read = b"GGGGACGTACGTACGTGGGG";
+        assert!(is_umi_in_read(umi, read, 0));
+
+        let read2 = b"GGGGACGTACGAACGTGGGG"; // 1 mismatch in the middle
+        assert!(is_umi_in_read(umi, read2, 1));
+        assert!(!is_umi_in_read(umi, read2, 0));
+    }
+}

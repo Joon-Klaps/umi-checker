@@ -116,3 +116,34 @@ pub fn create_fastq_writer(path: &Path) -> Result<Box<dyn Write>> {
 pub fn create_bam_writer(path: &Path, header: &bam::Header) -> Result<bam::Writer> {
     bam::Writer::from_path(path, header, bam::Format::Bam).context("Failed to create BAM writer")
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use std::io::{Result as IoResult, Write};
+
+    struct SharedWriter(Arc<Mutex<Vec<u8>>>);
+    impl Write for SharedWriter {
+        fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
+            let mut m = self.0.lock().unwrap();
+            m.extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> IoResult<()> { Ok(()) }
+    }
+
+    #[test]
+    fn test_write_fastq_format() {
+        let buf = Arc::new(Mutex::new(Vec::new()));
+        let mut writer = GenericWriter::Fastq(Box::new(SharedWriter(buf.clone())));
+
+        writer.write_fastq(b"read1", b"ACGT", Some(b"!!!!")).unwrap();
+
+        let output = buf.lock().unwrap();
+        let s = String::from_utf8_lossy(&output);
+        assert!(s.starts_with("@read1\n"));
+        assert!(s.contains("ACGT\n+\n!!!!"));
+    }
+}
