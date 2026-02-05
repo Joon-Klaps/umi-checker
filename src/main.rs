@@ -115,7 +115,7 @@ fn run(args: Args) -> Result<String> {
     }
 
     // Determine file type and process
-    let file_type = FileType::from_path(&args.input)?;
+    let file_type: FileType = FileType::from_path(&args.input)?;
 
     // Build output file paths (matched + removed) based on input suffix and provided prefix.
     // If --output is not provided we won't write output files (use None).
